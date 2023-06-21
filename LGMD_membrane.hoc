@@ -1,0 +1,155 @@
+
+forall {
+	Ra = axial
+	cm = Cm
+	insert pas
+	g_pas = gl
+	e_pas = el
+}
+
+/* --- Global channel kinetic parameters are set in .mod files--- */
+
+/* --- Adjust channel densities for each section --- */
+
+forsec "Axon" {
+	Ra = axial
+	g_pas=gl*6
+	insert M
+	gmax_M = SIZM
+	vhalf_M = -27
+	insert Na
+	gmax_Na = SIZNa*0.13
+	insert HH_Kdr
+	gmax_HH_Kdr = SIZKdr
+	ek = EK+8
+	ena = ENa
+}
+
+forsec siz {
+	Ra=axial*2
+	g_pas = gl*3
+	insert Na
+	gmax_Na = SIZNa
+	insert HH_Kdr
+	gmax_HH_Kdr = SIZKdr
+	insert M
+	gmax_M = SIZM
+	vhalf_M = -40
+	insert KCa
+	gmax_KCa = 0.008
+	insert CaT
+	gmax_CaT = 2.5e-4
+	insert CaS
+	gmax_CaS = 2.0e-3
+	insert CaIn
+	tau1_CaIn = 400
+	tau2_CaIn = 400
+	ek = EK
+	eca = ECa
+	ena = ENa
+}
+
+forsec "Handle" {
+	Ra = axial*0.5
+	insert Na
+	gmax_Na = 1.5e-2
+	insert HH_Kdr
+	gmax_HH_Kdr = SIZKdr/2
+	insert M
+	gmax_M = SIZM/3 // this value is irrelevent (set by handle_M_dist() )
+	vhalf_M = -48
+	ek = EK
+	ena = ENa
+}
+
+handle_Na_dist()
+handle_M_dist()
+forsec "Handle" gmax_Na=gmax_Na*0.44
+
+for i=0,40 {
+	Handle[i] {
+		insert KCa
+		gmax_KCa = 8.0e-3
+		insert CaT
+		gmax_CaT = 8.0e-4
+		insert CaS
+		gmax_CaS = 4.0e-3
+		insert CaIn
+		tau1_CaIn = 200
+		tau2_CaIn = 200
+		eca=ECa
+	}
+}
+
+Handle[60] distance()
+forsec FieldA {
+	
+	insert M
+	gmax_M = 7.0e-5
+	vhalf_M = -51
+
+	insert h
+	gmax_h = 1.0e-4
+
+	insert KD
+	gmax_KD = 1.5e-3
+	ek = EK
+}
+
+FindBranches( ParentBranch, ChildBranch, FieldA)
+
+forsec TineEnds Ra=30
+
+{Handle[25] distance() forsec FieldA gmax_h=0.45*gmax_h*(distance(0.5)/450)^6}
+Zratio_g( FieldA, "Handle[60]", "h", 0, 0, 1, 1.8, 0.01 )
+
+forsec FieldA gmax_KD = 2e-5 + gmax_h*8
+
+
+forsec "Field" {	// fields B and C (but not A)
+	Ra=axial
+	g_pas=gl*4
+	insert h
+	gmax_h = 5.5e-5
+
+	insert M
+	gmax_M = 1.0e-4
+	vhalf_M = -42
+	ek=EK
+}
+for i=0,15 FieldB[i].Ra=axial*0.75
+
+for i=0,21 {
+	FieldC[i] {Chandle.append()}
+}
+for i=22,454 {
+	FieldC[i] {Ctines.append()}
+}
+
+Zratio_g(Ctines, "FieldC[4]", "M", 2.2e-5, 20, 1,2)
+Zratio_g("FieldB", "FieldB[2]", "M", 1.2e-5, 20,1,2)
+
+forsec Chandle {
+	Ra=axial*0.75
+	if (ismembrane("NaP")) uninsert NaP
+	if (ismembrane("h")) uninsert h
+	g_pas = gl
+}
+
+forsec "CellBody"{	// process leading from dendrites to soma
+	insert M
+	gmax_M = 2.5e-4
+	vhalf_M = -48
+	g_pas=gl*5
+}
+
+
+forall {
+	if (ismembrane(Hname)) HList.append()
+	if (ismembrane(KDname)) KDList.append()
+	if (ismembrane("KA")) KAList.append()
+	if (ismembrane("CaT")) CaTList.append()
+	if (ismembrane("M")) MList.append()
+}
+
+

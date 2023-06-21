@@ -1,0 +1,34 @@
+//moddir mods
+
+// This model was created using nrn version 7.6. Should be compatible with newer versions,
+// but this has not been tested
+
+// load_file("nrngui.hoc")
+// load_file("mview.hoc")
+load_file("init.hoc")
+
+xpanel("Dewell & Gabbiani 2018 J Neurophysiol")
+  xlabel("See the readme for more info")
+
+  xlabel("Choose a simulation and then quit and restart to try another")
+// For simulations of injected simulated EPSP shown in figure 6:
+  xlabel("** Simulated EPSPs **")
+  xlabel("** Saves results to 'data/[date]/sEPSP' directory **")
+  xbutton("Figure 6 G,H","{sEPSP_series()}")
+
+// For step current simulations shown in figure 6:
+xlabel("******")
+  xlabel("** Current steps **")
+  xlabel("** Saves results to 'data/[date]/steps' directory **")
+  xbutton("Figure 6 D-F, and 7A","{step_series()}")
+
+// For simulations of chirp currents shown in figure 7:
+xlabel("******")
+  xlabel("** Chirp currents **")
+  xlabel("** Saves results to 'data/[date]/chirps' directory **")
+  xbutton("Figure 7","{chirp_series()}")
+  
+  xlabel(" ")
+  xbutton("Quit","quit()")
+xpanel()
+

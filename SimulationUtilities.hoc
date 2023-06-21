@@ -1,0 +1,280 @@
+
+
+proc SaveSections() { local i, opt
+// SaveSections( flag, sections )
+
+	opt=0
+	if ( (object_id(simsecs_G_,1) == -1) && (numarg()==0) )	{
+		opt = 1
+		seclist=1
+	}
+	
+	if (numarg()>0) {
+		if (argtype(1)==0)	{
+		opt = 1
+		seclist=$1
+		}
+	}
+	
+	if ( numarg() > 1 )	opt = 2
+	
+	if (object_id(simsecs_G_,1) == -1) simsecs_G_ = new SectionList()
+
+	if ( opt == 0 ) {
+		if (verbosity > 1) printf("SaveSections: simsecs_G_ unchanged\n")
+		return
+	} else if (opt == 1) {
+	
+		simsecs_G_ = new SectionList()
+		if (seclist==1) {
+			MakeSecList(simsecs_G_,"soma[0]","Handle[25]","MainTrunk[0]","FieldC[15]","FieldB[15]","Tines[287]",\
+				"Tines[7]","Tines[621]","Tines[786]","Tines[1080]","Tines[895]")
+		} else if (seclist==2) {
+			MakeSecList(simsecs_G_,"Handle[40]","MainTrunk[0]","FieldC[25]","Tines[786]","Tines[0]")
+		} else if (seclist==3) {
+			MakeSecList( simsecs_G_, "MainTrunk[0]" )
+		} if (seclist==4) {
+			MakeSecList(simsecs_G_,"MainTrunk[0]","Tines[287]","MainTrunk[40]",\
+				"Tines[7]","Tines[786]","Tines[1080]","Handle[20]")
+		} if (seclist==5) {
+			if (AEC) {
+				MakeSecList(simsecs_G_,"soma[0]","Tine0[7]","Tine3[6]")//,"Tine5[5]")//,\
+// 					"Tine8[8]","Tine17[4]")
+			} else MakeSecList(simsecs_G_,"soma[0]","Tines[530]","Tines[17]","Tines[621]",\
+				"Tines[1101]","Tines[1200]","Tines[795]")
+		}
+	} else if (opt==2) {
+		if (argtype(2)==1) {
+			simsecs_G_ = $o2
+		} else if (argtype(2)==2) {
+			for i=2,numarg() {
+				forall ifsec $si simsecs_G_.append()
+			}
+		} else {
+			if (verbosity > 0) printf("SaveSections: Sections must be specified as string or SectionList\nsimsecs_G_ unchanged\n")
+		}
+	}
+
+}
+
+proc SaveParams() { // local ims localobj LGMD, file, this
+// SaveParams( file name )
+// Saves global values and "forall psection()" to a text file
+// this file could then be loaded to recreate the model state (need custom file loader to handle point processes)
+
+    hoc_stdout($s1)
+    
+    PrintGlobals()
+    forall psection()
+
+    hoc_stdout()
+
+	if (verbosity > 1) printf("Saved global and section parameters to file ... \n")
+	
+}
+
+proc PrintGlobals() { local i,j,k,size,ptf localobj gls, ms, fobj
+// Prints the values of global parameters for membrane mechanisms
+//
+// PrintGlobals()
+// PrintGlobals( File )
+// PrintGlobals( List )
+// PrintGlobals( strdef )
+//
+// if List is empty or not given, all mechanisms from MechanismType(0) with global values are printed
+// if a strdef is given, all global values for the mechanism with the given name are printed
+
+ptf=0
+
+	if (numarg() > 0) {
+		if (argtype(1) == 1) {
+			if (isclass($o1, "List")) {
+				gls = $o1
+			} else if (isclass($o1, "File")) {
+				ptf=1
+				fobj = $o1
+				gls = new List()
+				MechList(gls)
+			}
+		} else if (argtype(1)==2) {
+			gls = new List()
+			MakeStringList(gls,$s1)
+		} else if (argtype(1)==0) {
+			gls = new List()
+			MechList(gls)
+		}
+	} else {
+		gls = new List()
+		MechList(gls)
+	}
+	
+	for j=0,gls.count()-1 {
+
+		ms = new MechanismStandard(gls.o(j).s, -1)
+		if (ms.count == 0) { continue }
+
+		for i=0, ms.count -1 {
+			size = ms.name(tmpstr, i)
+			if (size == 1) {
+				sprint(strtmp, "hoc_ac_ = %s", tmpstr)
+				execute(strtmp)
+				if (ptf==1) {
+					fobj.printf("%s = %g\n", tmpstr, hoc_ac_)
+				} else printf("%s = %g\n", tmpstr, hoc_ac_)
+			} else if (size < 20) {
+				for k=0, size-1 {
+					sprint(strtmp, "hoc_ac_ = %s[%d]", tmpstr, k)
+					execute(strtmp)
+					if (ptf==1) {
+						fobj.printf("%s[%d] = %g\n", tmpstr, k, hoc_ac_)
+					} else printf("%s[%d] = %g\n", tmpstr, k, hoc_ac_)
+				}
+			} else {
+				if (ptf==1) {
+					fobj.printf("%s[0 - %d]\n", tmpstr, size-1)
+				} else printf("%s[0 - %d]\n", tmpstr, size-1)
+			}
+		}
+	}
+}
+
+
+proc MVtextout() { local i
+	$o1.printf("%s\n", $o2.s)
+	if ($o2.children != nil) {
+		for i=0, $o2.children.count-1 {
+			MVtextout($o1, $o2.children.object(i))
+		}
+	}
+}
+
+
+proc SaveData() { local i,k, count, ti, tg	localobj savdata, rec_matrix
+//SaveData( filename, headerstr, Vm count, Im, G )
+
+	if (numarg()<3) {
+		if (verbosity > 0) printf("SaveData: not enough inputs. Not Saving \n")
+		return
+	} else if (verbosity > 1) printf("SaveData: saving data ... \n")
+
+	savdata = new File()
+	savdata.wopen($s1)
+	count = $3
+
+	if (verbosity > 2) printf("SaveData: opened file %s for writing ... \n", $s1)
+
+	ti=0
+	tg=0
+	k = count+1
+	if (numarg() > 3)	ti = $4
+	if (numarg() > 4)	tg = $5
+	if (ti) k+=1
+	if (tg)	k+=gvec_G_.count()
+
+	if (verbosity > 2) printf("SaveData: saving voltage of %g sections plus %g additional vectors\n", count, ti-1)
+	rec_matrix = new Matrix(tvec_G_.size(), k)
+// 	rec_matrix.resize(tvec_G_.size(), count+ti)
+	rec_matrix.setcol(0,tvec_G_)
+	for (i=1; i<=count; i=i+1) {
+		rec_matrix.setcol(i,rvec_G_[i-1])
+	}
+	if (ti) {
+		rec_matrix.setcol(i,ivec_G_)
+		i+=1
+	}
+	if (tg) {
+		for k=0,gvec_G_.count()-1 {
+			rec_matrix.setcol(i,gvec_G_.o(k))
+			if (verbosity > 3) printf("SaveData: saving %s of length %g in column %g\n", gvec_G_.o(k).label, gvec_G_.o(k).size, i)
+			i+=1
+		}
+	}
+
+	savdata.printf($s2)
+	rec_matrix.fprint(savdata,"%-1.8g ")
+	savdata.printf( "time " )
+// 	fix this bug. simsecs_G_ might not be used
+// 	forsec simsecs_G_ savdata.printf( "%s ", secname() )
+	for k=0,count-1 {
+		savdata.printf( "%s ", rvec_G_[k].label() )
+	}
+	if (ti) savdata.printf( "Im " )
+	if (tg) {
+		for k=0,gvec_G_.count()-1 {
+			savdata.printf( "%s ", gvec_G_.o(k).label() )
+		}
+	}
+	savdata.printf( "\n" )
+	savdata.close()
+
+}
+
+proc SaveImpedanceProfile() {local fmin,fmax,fres,f,ims	localobj Imp, fobj, sl
+// SaveImpedanceProfile( filename, section(s), max freq, min freq, freq step)
+//	calculates and prints input impedance and phase values for specified sections
+//	at frequencies of minfreq:freqstep:maxfreq
+
+	if (numarg()<2) {
+		if (verbosity > 0) printf("SaveImpedanceProfile: not enough inputs. Not Saving \n")
+		return
+	} else if (verbosity > 3) printf("SaveImpedanceProfile: saving profiles ... \n")
+	
+	sl = new SectionList()
+	if (argtype(2)==1) {
+		sl = $o2
+	} else if (argtype(2)==2) {
+		forall ifsec $s2 sl.append()
+	} else {
+		if (verbosity > 0) printf("SaveImpedanceProfile: 2nd argin must be section string or SectionList\n")
+		return
+	}
+
+	fmin=0
+	fmax=50
+	fres = 0.5
+	if (numarg() > 2)	fmax = $3
+	if (numarg() > 3)	fmin = $4
+	if (numarg() > 4)	fres = $5
+	
+	ims = issplit()		// check if multisplit is on
+	if (ims) stopPar()	// if multisplit is on, stop it
+
+	Imp = new Impedance()
+	Imp.loc(0.5)
+
+	fobj = new File()
+	fobj.wopen($s1)
+	
+	if (verbosity > 2) printf("SaveImpedanceProfile: opened file %s for writing ... \n", $s1)
+
+	fobj.printf( "ImpedanceProfiles\n" )
+	fobj.printf( "Min frequency = %d(Hz):\t", fmin)
+	fobj.printf( "Max frequency = %d(Hz):\t", fmax)
+	fobj.printf( "Frequency step = %d(Hz):\n", fres)
+	fobj.printf( "\n" )
+
+	fobj.printf( "freq\t" )
+	forsec sl {
+		fobj.printf( "%s.ZAP(MΩ)\t", secname() )
+		fobj.printf( "%s.ZPP(deg)\t", secname() )
+	}
+	fobj.printf( "\n" )
+	
+	for (f=fmin; f <= fmax; f=f+fres) {
+	
+		Imp.compute(f)
+		fobj.printf( "%-1.8g\t", f)
+
+		forsec sl {
+	
+			Imp.input_phase(0.5)
+			fobj.printf( "%-1.8g\t",  Imp.input(0.5))
+			fobj.printf( "%-1.8g\t",  Imp.input_phase(0.5)/PI*180)
+		}
+		fobj.printf( "\n" )
+	}
+	fobj.printf( "\n" )
+	fobj.close()
+	
+	if (ims) startPar()
+}
